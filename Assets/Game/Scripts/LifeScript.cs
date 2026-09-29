@@ -2,54 +2,45 @@ using System;
 using NaughtyAttributes;
 using UnityEngine;
 
-public enum LIVING_TEAM
+public class LifeScript : MonoBehaviour
 {
-    Player,
-    Enemies,
-    Other
-}
-
-public class LivingScript : MonoBehaviour
-{
-    [SerializeField] private LIVING_TEAM _team;
+    public enum GO_TEAM
+    {
+        Player,
+        Enemies,
+        Other
+    }
+    
+    [SerializeField] private GO_TEAM _team;
     [SerializeField] private float _maxLife;
     [ShowNonSerializedField] private float _life;
     
-    // parameter = void
     public event Action OnDamaged;
     public event Action OnDeath;
-    // <parameters ...>
-    public event Action<string> OnDamagedAndDisplayMessage;
-    // <parameters, ... , returnType>
-    public Func<int, int, double> MultiplierFunction;
     
-    // Properties
-    public LIVING_TEAM LivingTeam
+    public GO_TEAM GoTeam
     {
         get => _team;
         private set => _team = value;
     }
     public float MaxLife
     {
-        private set => _maxLife = value;
         get => _maxLife;
+        private set => _maxLife = value;
     }
-    
     public float Life
     {
-        set => _life = value;
         get => _life;
+        private set => _life = value;
     }
-
     public bool IsAlive
     {
         get => Life > 0;
     }
-
-    // Methods
+    
     void Reset()
     {
-        LivingTeam = LIVING_TEAM.Other;
+        GoTeam = GO_TEAM.Other;
         MaxLife = 5f;
         Life = MaxLife;
     }
@@ -59,13 +50,14 @@ public class LivingScript : MonoBehaviour
         Life = MaxLife;
     }
     
-    public void DealDamage(float damage)
+    public void ApplyDamage(float damage)
     {
         if(IsAlive == false) return;
         
         Life -= damage;
         OnDamaged?.Invoke();
-        Debug.Log($"{name} taken {damage} damage");
+        
+        Debug.Log($"[LifeScript] Dealing {damage} damage");
 
         if(IsAlive) return;
         
@@ -76,6 +68,4 @@ public class LivingScript : MonoBehaviour
     {
         Life = MaxLife;
     }
-    
-    
 }
