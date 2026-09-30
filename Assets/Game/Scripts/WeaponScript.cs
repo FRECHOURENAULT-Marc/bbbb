@@ -97,7 +97,6 @@ public class WeaponScript : MonoBehaviour
                 .IsName(_animationStateAttack) == false)
         {
             await Awaitable.NextFrameAsync();
-            _timerBeforeDamage = Time.time - startTime; // increase timer before attack
         }
         
         // Play attack animation : Wait until animation _animationStateAttack ended
