@@ -15,6 +15,8 @@ public class LifeScript : MonoBehaviour
     [SerializeField] private float _maxLife;
     [ShowNonSerializedField] private float _life;
     
+    bool _isInvincible;
+    
     public event Action OnDamaged;
     public event Action OnDeath;
     
@@ -37,6 +39,12 @@ public class LifeScript : MonoBehaviour
     {
         get => Life > 0;
     }
+
+    public bool IsInvincible
+    {
+        get => _isInvincible;
+        set => _isInvincible = value;
+    }
     
     void Reset()
     {
@@ -53,6 +61,7 @@ public class LifeScript : MonoBehaviour
     public void ApplyDamage(float damage)
     {
         if(IsAlive == false) return;
+        if (IsInvincible) return;
         
         Life -= damage;
         OnDamaged?.Invoke();
