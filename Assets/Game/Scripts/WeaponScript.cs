@@ -1,67 +1,84 @@
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
 
 public class WeaponScript : MonoBehaviour
 {
-    [Header("Stats")]
-    [SerializeField] float _damage;
-    [SerializeField] float _timeBeforeDamage;
-    [SerializeField] float _recoveryTime;
-    [SerializeField] UnityEvent _onContact;
-
-    float _recoveryTimer;
-    float _timerBeforeDamage;
-    List<LifeScript> _damagedEntities;
-    
     [Header("Dependencies")]
     [SerializeField] ColliderEvent _collider;
     [SerializeField] LifeScript.GO_TEAM _team;
-    [SerializeField] Animator _weaponAnimator;
-    [SerializeField] string _animatorAttackTrigger;
-    [SerializeField] string _animationStateAttack;
     
-    [Header("Debug")] // Debug
-    [SerializeField] InputActionReference _attackInput;
+    [Header("Stats")]
+    [SerializeField] float _damage;
+    [SerializeField] float _beforeDamageTime;
+    [SerializeField] float _attackTime;
+    [SerializeField] float _recoveryTime;
+    [SerializeField] UnityEvent _onStartCharging;
+    [SerializeField] UnityEvent _onStartAttacking;
+    [SerializeField] UnityEvent _onContact;
+
+    float _beforeDamageTimer;
+    float _recoveryTimer;
+    float _attackTimer;
+    List<LifeScript> _damagedEntities;
+
+    public bool IsInAttackingState
+    {
+        get => _attackTimer > 0;
+    }      
+    public bool IsAttackReady
+    {
+        get => _recoveryTimer > _recoveryTime && (IsCurrentlyAttacking == false);
+    }    
+    public bool IsCurrentlyAttacking
+    {
+        get => (_beforeDamageTimer > 0 && _beforeDamageTimer < _beforeDamageTime) 
+               || (_attackTimer > 0 && _attackTimer < _attackTime);
+    }
 
     void Reset()
     {
         _damage = 1.0f;
-        _timeBeforeDamage = 0.25f;
+        _beforeDamageTime = 0.25f;
+        _attackTime = 1.0f;
         _recoveryTime = 1.0f;
-        
-        _animatorAttackTrigger = "Attack";
-        _animationStateAttack = "Attack";
     }
     
     void Start()
     {
         // Test if dependencies are filled
-        if(_collider == null || _weaponAnimator == null)
+        if(_collider == null)
         {
-            Debug.LogError("No collider or no _weaponAnimator defined");
+            Debug.LogError("No collider defined");
             Destroy(this);
             return;
         }
         
         _damagedEntities = new List<LifeScript>();
         _collider.onTriggerStay += InflictDamage;
-        
-        //Debug
-        if (_attackInput)
-            _attackInput.action.started += (context) => Attack();
+        _recoveryTimer = _recoveryTime;
+    }
+
+    void ResetFields()
+    {
+        _damagedEntities.Clear();
+        _beforeDamageTimer = 0;
+        _attackTimer = 0;
+        _recoveryTimer = 0;
     }
 
     void InflictDamage(Collider other)
     {
         // Do not apply damage if _timerBeforeDamage is not complete
-        if (_timerBeforeDamage < _timeBeforeDamage)
+        if (IsInAttackingState == false)
             return;
         
         // Be sure the target is a living entity
-        if (other.TryGetComponent(out LifeScript life) == false)
+        if (other.TryGetComponent(out LifeProxy proxy) == false)
             return;
+        LifeScript life = proxy._script;
         // Be sure the target is not damaged more than one time by the same attack
         if (_damagedEntities.Contains(life))
             return;
@@ -74,49 +91,54 @@ public class WeaponScript : MonoBehaviour
         _damagedEntities.Add(life);
     }
 
-    public async void Attack()
+    public void Attack() => AttackAsync();
+
+    public async void AttackAsync(CancellationToken cancel = default)
     {
-        if (_recoveryTimer < _recoveryTime)
-        {
-            Debug.Log("Recovering... (" +  _recoveryTimer/_recoveryTime*100.0f + "%)");
+        if(cancel == CancellationToken.None)
+            cancel = destroyCancellationToken;
+
+        if (IsAttackReady == false)
             return;
-        }
+        
         // Ready !
         
-        //// Reset fields (_recoveryTimer & _damagedEntities)
-        _damagedEntities.Clear();
-        _recoveryTimer = 0;
-        
-        //// Handle Animation
-        _weaponAnimator.SetTrigger(_animatorAttackTrigger);
-        
+        // Time before attacking
+        _onStartCharging?.Invoke();
         float startTime = Time.time;
-        // Transition to attack animation : Wait until animation _animationStateAttack started
-        while (
-            _weaponAnimator.GetCurrentAnimatorStateInfo(0)
-                .IsName(_animationStateAttack) == false)
+        while (_beforeDamageTimer < _beforeDamageTime)
         {
-            await Awaitable.NextFrameAsync();
+            await Awaitable.NextFrameAsync(cancel);
+            if (cancel.IsCancellationRequested)
+                return;
+            
+            _beforeDamageTimer = Time.time - startTime;
         }
         
-        // Play attack animation : Wait until animation _animationStateAttack ended
-        while (_weaponAnimator.GetCurrentAnimatorStateInfo(0)
-                   .normalizedTime < 1f)
+        // Attack time
+        _onStartAttacking?.Invoke();
+        startTime = Time.time;
+        while (_attackTimer < _attackTime)
         {
-            await Awaitable.NextFrameAsync();
-            _timerBeforeDamage = Time.time - startTime;  // increase timer before attack
-        }
+            await Awaitable.NextFrameAsync(cancel);
+            if (cancel.IsCancellationRequested)
+                return;
+            
+            _attackTimer = Time.time - startTime;
+        }        
         
-        // End of animation (reset _timerBeforeDamage to let _recoveryTimer updating)
-        _timerBeforeDamage = 0;
+        // Reset fields (timers & _damagedEntities)
+        ResetFields();
     }
 
-    void Update()
+    void FixedUpdate()
     {
-        // Do not update _recoveryTimer if attack is currently playing
-        if (_timerBeforeDamage > 0.0f)
+        if (IsCurrentlyAttacking)
+            return;
+
+        if (_recoveryTimer > _recoveryTime)
             return;
         
-        _recoveryTimer += Time.deltaTime;
+        _recoveryTimer += Time.fixedDeltaTime;
     }
 }
