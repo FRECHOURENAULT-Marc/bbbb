@@ -87,7 +87,7 @@ public class WeaponScript : MonoBehaviour
             return;
         
         _onContact?.Invoke();
-        life.ApplyDamage(_damage);
+        life.TryDamaging(_damage);
         _damagedEntities.Add(life);
     }
 

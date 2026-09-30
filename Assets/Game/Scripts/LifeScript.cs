@@ -57,20 +57,28 @@ public class LifeScript : MonoBehaviour
     {
         Life = MaxLife;
     }
-    
+
     public void ApplyDamage(float damage)
     {
-        if(IsAlive == false) return;
-        if (IsInvincible) return;
+        bool alreadyDead = !IsAlive;
         
         Life -= damage;
         OnDamaged?.Invoke();
         
         Debug.Log($"[LifeScript] Dealing {damage} damage");
 
-        if(IsAlive) return;
+        if (IsAlive) return;
+        if (alreadyDead) return;
         
         OnDeath?.Invoke();
+    }
+    
+    public void TryDamaging(float damage)
+    {
+        if (IsAlive == false) return;
+        if (IsInvincible) return;
+        
+        ApplyDamage(damage);
     }
 
     public void Respawn()

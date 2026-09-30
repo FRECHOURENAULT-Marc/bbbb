@@ -7,21 +7,26 @@ public class Parade : MonoBehaviour
 {
     [Header("Stats")]
     [SerializeField] float _recoveryTime;
-    [SerializeField] float _paradeTime;
+    [SerializeField] float _parryTime;
     
     float _recoveryTimer;
-    float _paradeTimer;
+    float _parryTimer;
     
     [Header("Dependencies")]
     [SerializeField] LifeScript _life;
     
     [Header("Debug")] // Debug
-    [SerializeField] InputActionReference _paradeInput;
+    [SerializeField] InputActionReference _parryInput;
+
+    public bool IsParring
+    {
+        get { return _parryTimer > 0; }
+    }
     
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Reset()
     {
         _recoveryTime = 1.0f;
+        _parryTime = 1.0f;
     }
 
     public async void StopAttack()
@@ -32,32 +37,36 @@ public class Parade : MonoBehaviour
             return;
         }
         // Ready !
-
         _recoveryTimer = 0;
 
         _life.IsInvincible = true;
+        Debug.Log("Invincible");
         
         float startTime = Time.time;
-        while (_paradeTimer < _paradeTime)
+        while (_parryTimer < _parryTime)
         {
             await Awaitable.NextFrameAsync();
-            _paradeTimer = Time.time - startTime;
+            _parryTimer = Time.time - startTime;
+
         }
         
         _life.IsInvincible = false;
+        _parryTimer = 0;
+        Debug.Log("Not invincible");
     }
     
     void Start()
     {
         //Debug
-        if (_paradeInput)
-            _paradeInput.action.started += (context) => StopAttack();  
+        if (_parryInput)
+            _parryInput.action.started += (context) => StopAttack();  
     }
     
     // Update is called once per frame
     void Update()
     {
-        if ( _life.IsInvincible == false)
-            _recoveryTimer += Time.deltaTime;
+        if (IsParring)
+            return;
+        _recoveryTimer += Time.deltaTime;
     }
 }
